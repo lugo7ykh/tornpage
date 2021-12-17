@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::{Content, Item, Render};
-use super::{ItemPart, Merge};
+use super::{ItemPart, Glue};
 
 fn create_item_part_1() -> ItemPart<'static> {
     ItemPart {
@@ -27,14 +27,14 @@ fn create_item_part_2() -> ItemPart<'static> {
 }
 
 #[test]
-fn merge_item_parts() {
+fn glue_item_parts() {
     let item_part_1 = create_item_part_1();
     let item_part_2 = create_item_part_2();
 
-    let merged_item = ItemPart::merge(&vec![&item_part_1, &item_part_2, &item_part_2]);
+    let glued_item = ItemPart::glue(&vec![&item_part_1, &item_part_2, &item_part_2]);
 
     assert_eq!(
-        merged_item,
+        glued_item,
         Some(ItemPart {
             tag: Some("a".into()),
             class: Some(HashSet::from(["pretty", "button"].map(|name| name.into()))),
@@ -66,10 +66,10 @@ fn render_item_part_2() {
 }
 
 #[test]
-fn render_merged_item() {
-    let merged_item =
-        ItemPart::merge(&vec![&create_item_part_1(), &create_item_part_2()]).expect("can't merge");
-    let rendered_item = Item::Part(&merged_item).render();
+fn render_glued_item() {
+    let glued_item =
+        ItemPart::glue(&vec![&create_item_part_1(), &create_item_part_2()]).expect("can't glue");
+    let rendered_item = Item::Part(&glued_item).render();
 
     assert!(
         rendered_item

@@ -53,8 +53,8 @@ pub enum Page<'a> {
     Parts(PageParts<'a>),
 }
 
-trait Merge {
-    fn merge(parts: &Vec<&Self>) -> Option<Self>
+trait Glue {
+    fn glue(parts: &Vec<&Self>) -> Option<Self>
     where
         Self: Sized;
 }
@@ -132,8 +132,8 @@ impl<'a, T: Into<Item<'a>>> Add<T> for Item<'a> {
     }
 }
 
-impl<'a> Merge for Content<'a> {
-    fn merge(parts: &Vec<&Self>) -> Option<Self> {
+impl<'a> Glue for Content<'a> {
+    fn glue(parts: &Vec<&Self>) -> Option<Self> {
         let mut content = None;
 
         for part in parts.iter().rev() {
@@ -189,8 +189,8 @@ fn calc_attrs_capacity(parts: &ItemParts) -> usize {
         .sum()
 }
 
-impl<'a> Merge for ItemPart<'a> {
-    fn merge(parts: &Vec<&Self>) -> Option<Self> {
+impl<'a> Glue for ItemPart<'a> {
+    fn glue(parts: &Vec<&Self>) -> Option<Self> {
         let mut tag = None;
         let mut class = None;
         let mut attrs = None;
@@ -236,7 +236,7 @@ impl<'a> Merge for ItemPart<'a> {
                         || !EMPTY_ELEMENT_TAGS.contains(&tag.as_ref().unwrap().as_str()) =>
                 {
                     content_parts.reverse();
-                    Content::merge(&content_parts)
+                    Content::glue(&content_parts)
                 }
                 _ => None,
             };
@@ -271,7 +271,7 @@ impl<'a> Render for Content<'a> {
 
 impl<'a> Render for Item<'a> {
     fn render(&self) -> String {
-        let mut merged_item;
+        let mut glued_item;
 
         let ItemPart {
             tag,
@@ -282,8 +282,8 @@ impl<'a> Render for Item<'a> {
         } = match self {
             Item::Part(part) => *part,
             Item::Parts(item_parts) => {
-                merged_item = ItemPart::merge(item_parts);
-                merged_item.get_or_insert_with(Default::default)
+                glued_item = ItemPart::glue(item_parts);
+                glued_item.get_or_insert_with(Default::default)
             }
         };
         if tag.is_none() {
