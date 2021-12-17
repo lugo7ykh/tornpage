@@ -50,7 +50,7 @@ fn glue_item_parts() {
 
 #[test]
 fn render_item_part_1() {
-    let rendered_item = Item::Part(&create_item_part_1()).render();
+    let rendered_item = Item::from(&create_item_part_1()).render();
 
     assert_eq!(
         rendered_item,
@@ -60,7 +60,7 @@ fn render_item_part_1() {
 
 #[test]
 fn render_item_part_2() {
-    let rendered_item = Item::Part(&create_item_part_2()).render();
+    let rendered_item = Item::from(&create_item_part_2()).render();
 
     assert_eq!(rendered_item, "")
 }
@@ -69,7 +69,7 @@ fn render_item_part_2() {
 fn render_glued_item() {
     let glued_item =
         ItemPart::glue(&vec![&create_item_part_1(), &create_item_part_2()]).expect("can't glue");
-    let rendered_item = Item::Part(&glued_item).render();
+    let rendered_item = Item::from(&glued_item).render();
 
     assert!(
         rendered_item
