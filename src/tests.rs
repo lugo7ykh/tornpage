@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::{Content, Item, Render};
-use super::{ItemPart, Glue};
+use super::{Glue, ItemPart};
 
 fn create_item_part_1() -> ItemPart<'static> {
     ItemPart {
@@ -11,7 +11,6 @@ fn create_item_part_1() -> ItemPart<'static> {
             [("hreflang", "en")].map(|(key, value)| (key.into(), value.into())),
         )),
         content: Some(Content::from("Hello")),
-        slots: Some(vec!["label".into(), "info".into()]),
     }
 }
 fn create_item_part_2() -> ItemPart<'static> {
@@ -22,7 +21,6 @@ fn create_item_part_2() -> ItemPart<'static> {
             [("href", "/hello")].map(|(key, value)| (key.into(), value.into())),
         )),
         content: Some(Content::from(" World!")),
-        slots: None,
     }
 }
 
@@ -43,7 +41,6 @@ fn glue_item_parts() {
                     .map(|(key, value)| (key.into(), value.into()))
             )),
             content: Some(Content::from("Hello World! World!")),
-            slots: Some(vec!["label".into(), "info".into()]),
         })
     );
 }
