@@ -11,10 +11,13 @@ const EMPTY_ELEMENT_TAGS: [&str; 14] = [
     "track", "wbr",
 ];
 
+type Slots = Vec<String>;
+type ItemList<'a> = HashMap<String, Item<'a>>;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Content<'a> {
     Text(String),
-    Items(HashMap<String, Item<'a>>),
+    Items(Option<Slots>, Option<ItemList<'a>>),
 }
 impl<'a> Default for Content<'a> {
     fn default() -> Self {
@@ -27,7 +30,6 @@ pub struct ItemPart<'a> {
     pub tag: Option<String>,
     pub class: Option<HashSet<String>>,
     pub attrs: Option<HashMap<String, String>>,
-    pub slots: Option<Vec<String>>,
     pub content: Option<Content<'a>>,
 }
 type ItemParts<'a> = Vec<&'a ItemPart<'a>>;
@@ -67,9 +69,27 @@ impl<'a> From<&str> for Content<'a> {
         Content::Text(text.into())
     }
 }
-impl<'a> From<HashMap<String, Item<'a>>> for Content<'a> {
-    fn from(items: HashMap<String, Item<'a>>) -> Self {
-        Content::Items(items)
+impl<'a, S: Into<String>, I: Into<Item<'a>>> From<HashMap<S, I>> for Content<'a> {
+    fn from(items: HashMap<S, I>) -> Self {
+        Content::Items(
+            None,
+            Some(
+                items
+                    .into_iter()
+                    .map(|(s, i)| (s.into(), i.into()))
+                    .collect(),
+            ),
+        )
+    }
+}
+impl<'a, N: Into<String>> From<Vec<N>> for Content<'a> {
+    fn from(slots: Vec<N>) -> Self {
+        Content::Items(Some(slots.into_iter().map(|n| n.into()).collect()), None)
+    }
+}
+impl<'a, T: Into<String>> From<(Vec<T>, HashMap<String, Item<'a>>)> for Content<'a> {
+    fn from((slots, items): (Vec<T>, HashMap<String, Item<'a>>)) -> Self {
+        Content::glue(&vec![&slots.into(), &items.into()]).unwrap_or_default()
     }
 }
 
@@ -145,20 +165,27 @@ impl<'a> Glue for Content<'a> {
                         break;
                     }
                 }
-                Content::Items(part_items) => {
-                    if let Content::Items(items) =
-                        content.get_or_insert_with(|| Content::Items(HashMap::new()))
+                Content::Items(part_slots, part_items) => {
+                    if let Content::Items(slots, items) =
+                        content.get_or_insert_with(|| Content::Items(None, None))
                     {
-                        for (id, part_item) in part_items {
-                            let item = items.remove(id);
-                            items.insert(
-                                id.into(),
-                                if let Some(item) = item {
-                                    part_item.clone() + item
-                                } else {
-                                    part_item.clone()
-                                },
-                            );
+                        if slots.is_none() && part_slots.is_some() {
+                            *slots = part_slots.clone();
+                        }
+                        if let Some(part_items) = part_items {
+                            let items = items.get_or_insert_with(|| HashMap::new());
+
+                            for (id, part_item) in part_items {
+                                let item = items.remove(id);
+                                items.insert(
+                                    id.into(),
+                                    if let Some(item) = item {
+                                        part_item.clone() + item
+                                    } else {
+                                        part_item.clone()
+                                    },
+                                );
+                            }
                         }
                     } else {
                         break;
@@ -194,7 +221,6 @@ impl<'a> Glue for ItemPart<'a> {
         let mut tag = None;
         let mut class = None;
         let mut attrs = None;
-        let mut slots = None;
         let mut content_parts = None;
 
         for part in parts.iter().rev() {
@@ -215,7 +241,6 @@ impl<'a> Glue for ItemPart<'a> {
             }
             if part.tag.is_some() {
                 tag = part.tag.clone();
-                slots = part.slots.clone();
 
                 break;
             }
@@ -245,7 +270,6 @@ impl<'a> Glue for ItemPart<'a> {
                 tag,
                 class,
                 attrs,
-                slots,
                 content,
             })
         }
@@ -260,11 +284,12 @@ impl<'a> Render for Content<'a> {
         };
         match self {
             Self::Text(text) => text.clone(),
-            Self::Items(items) => items
+            Self::Items(Some(slots), Some(items)) => items
                 .iter()
                 .map(|(id, item)| item.clone().add(&create_id_part(id)).render())
                 .reduce(|a, b| a + &b)
                 .unwrap_or_default(),
+            _ => Default::default(),
         }
     }
 }
