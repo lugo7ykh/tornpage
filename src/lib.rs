@@ -21,7 +21,7 @@ pub enum Content<'a> {
 }
 impl<'a> Default for Content<'a> {
     fn default() -> Self {
-        Content::from("")
+        Content::Items(None, None)
     }
 }
 
@@ -159,7 +159,7 @@ impl<'a> Glue for Content<'a> {
         for part in parts.iter().rev() {
             match part {
                 Content::Text(part_text) => {
-                    if let Content::Text(text) = content.get_or_insert_with(Default::default) {
+                    if let Content::Text(text) = content.get_or_insert_with(|| "".into()) {
                         text.insert_str(0, part_text);
                     } else {
                         break;
