@@ -287,6 +287,8 @@ impl<'a> Glue for ItemPart<'a> {
 
 impl<'a> Render for Content<'a> {
     fn render(&self) -> String {
+        let mut generated_slots = None;
+
         let create_id_part = |id: &str| ItemPart {
             attrs: Some(HashMap::from([("id".into(), id.into())])),
             ..Default::default()
@@ -296,22 +298,16 @@ impl<'a> Render for Content<'a> {
             Self::Text(text) => text.clone(),
 
             Self::Items(slots, items) => match items {
-                Some(items) => match slots {
-                    Some(slots) => slots
-                        .iter()
-                        .filter_map(|name| match items.get(name) {
-                            Some(item) => Some(item.clone().add(&create_id_part(name)).render()),
-                            _ => None,
-                        })
-                        .reduce(|a, b| a + &b),
-
-                    None => items
-                        .iter()
-                        .map(|(id, item)| item.clone().add(&create_id_part(id)).render())
-                        .reduce(|a, b| a + &b),
-                }
-                .unwrap_or_default(),
-
+                Some(items) => slots
+                    .as_ref()
+                    .unwrap_or_else(|| generated_slots.insert(items.keys().cloned().collect()))
+                    .iter()
+                    .filter_map(|name| match items.get(name) {
+                        Some(item) => Some(item.clone().add(&create_id_part(name)).render()),
+                        _ => None,
+                    })
+                    .reduce(|a, b| a + &b)
+                    .unwrap_or_default(),
                 None => "".into(),
             },
         }
