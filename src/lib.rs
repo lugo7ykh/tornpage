@@ -291,14 +291,29 @@ impl<'a> Render for Content<'a> {
             attrs: Some(HashMap::from([("id".into(), id.into())])),
             ..Default::default()
         };
+
         match self {
             Self::Text(text) => text.clone(),
-            Self::Items(Some(slots), Some(items)) => items
-                .iter()
-                .map(|(id, item)| item.clone().add(&create_id_part(id)).render())
-                .reduce(|a, b| a + &b)
+
+            Self::Items(slots, items) => match items {
+                Some(items) => match slots {
+                    Some(slots) => slots
+                        .iter()
+                        .filter_map(|name| match items.get(name) {
+                            Some(item) => Some(item.clone().add(&create_id_part(name)).render()),
+                            _ => None,
+                        })
+                        .reduce(|a, b| a + &b),
+
+                    None => items
+                        .iter()
+                        .map(|(id, item)| item.clone().add(&create_id_part(id)).render())
+                        .reduce(|a, b| a + &b),
+                }
                 .unwrap_or_default(),
-            _ => Default::default(),
+
+                None => "".into(),
+            },
         }
     }
 }
