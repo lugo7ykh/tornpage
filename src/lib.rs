@@ -69,27 +69,36 @@ impl<'a> From<&str> for Content<'a> {
         Content::Text(text.into())
     }
 }
-impl<'a, S: Into<String>, I: Into<Item<'a>>> From<HashMap<S, I>> for Content<'a> {
-    fn from(items: HashMap<S, I>) -> Self {
-        Content::Items(
-            None,
-            Some(
-                items
-                    .into_iter()
-                    .map(|(s, i)| (s.into(), i.into()))
-                    .collect(),
-            ),
-        )
-    }
-}
 impl<'a, N: Into<String>> From<Vec<N>> for Content<'a> {
     fn from(slots: Vec<N>) -> Self {
         Content::Items(Some(slots.into_iter().map(|n| n.into()).collect()), None)
     }
 }
-impl<'a, T: Into<String>> From<(Vec<T>, HashMap<String, Item<'a>>)> for Content<'a> {
-    fn from((slots, items): (Vec<T>, HashMap<String, Item<'a>>)) -> Self {
-        Content::glue(&vec![&slots.into(), &items.into()]).unwrap_or_default()
+impl<'a, N: Into<String>, I: Into<Item<'a>>> From<HashMap<N, I>> for Content<'a> {
+    fn from(items: HashMap<N, I>) -> Self {
+        Content::Items(
+            None,
+            Some(
+                items
+                    .into_iter()
+                    .map(|(n, i)| (n.into(), i.into()))
+                    .collect(),
+            ),
+        )
+    }
+}
+impl<'a, N: Into<String>, I: Into<Item<'a>>> From<(Vec<N>, HashMap<N, I>)> for Content<'a> {
+    fn from((slots, items): (Vec<N>, HashMap<N, I>)) -> Self {
+        Content::Items(
+            match slots.into() {
+                Content::Items(slots, _) => slots,
+                _ => None,
+            },
+            match items.into() {
+                Content::Items(_, items) => items,
+                _ => None,
+            },
+        )
     }
 }
 
