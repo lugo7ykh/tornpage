@@ -4,6 +4,7 @@ mod tests;
 use std::{
     collections::{HashMap, HashSet},
     ops::Add,
+    usize,
 };
 
 const EMPTY_ELEMENT_TAGS: [&str; 14] = [
@@ -69,13 +70,17 @@ impl<'a> From<&str> for Content<'a> {
         Content::Text(text.into())
     }
 }
-impl<'a, N: Into<String>> From<Vec<N>> for Content<'a> {
-    fn from(slots: Vec<N>) -> Self {
-        Content::Items(Some(slots.into_iter().map(|n| n.into()).collect()), None)
+impl<'a, S: Into<String>> From<Vec<S>> for Content<'a> {
+    fn from(slots: Vec<S>) -> Self {
+        Content::Items(Some(slots.into_iter().map(|s| s.into()).collect()), None)
     }
 }
-impl<'a, N: Into<String>, I: Into<Item<'a>>> From<HashMap<N, I>> for Content<'a> {
-    fn from(items: HashMap<N, I>) -> Self {
+impl<'a, S, I, const N: usize> From<[(S, I); N]> for Content<'a>
+where
+    S: Into<String>,
+    I: Into<Item<'a>>,
+{
+    fn from(items: [(S, I); N]) -> Self {
         Content::Items(
             None,
             Some(
@@ -87,8 +92,12 @@ impl<'a, N: Into<String>, I: Into<Item<'a>>> From<HashMap<N, I>> for Content<'a>
         )
     }
 }
-impl<'a, N: Into<String>, I: Into<Item<'a>>> From<(Vec<N>, HashMap<N, I>)> for Content<'a> {
-    fn from((slots, items): (Vec<N>, HashMap<N, I>)) -> Self {
+impl<'a, S, I, const N: usize> From<(Vec<S>, [(S, I); N])> for Content<'a>
+where
+    S: Into<String>,
+    I: Into<Item<'a>>,
+{
+    fn from((slots, items): (Vec<S>, [(S, I); N])) -> Self {
         Content::Items(
             match slots.into() {
                 Content::Items(slots, _) => slots,
