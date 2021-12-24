@@ -10,7 +10,7 @@ fn create_item_part_1() -> ItemPart<'static> {
         attrs: Some(HashMap::from(
             [("hreflang", "en")].map(|(key, value)| (key.into(), value.into())),
         )),
-        content: Some(Content::from("Hello")),
+        content: Some("Hello".into()),
     }
 }
 fn create_item_part_2() -> ItemPart<'static> {
@@ -20,7 +20,7 @@ fn create_item_part_2() -> ItemPart<'static> {
         attrs: Some(HashMap::from(
             [("href", "/hello")].map(|(key, value)| (key.into(), value.into())),
         )),
-        content: Some(Content::from(" World!")),
+        content: Some(" World!".into()),
     }
 }
 
@@ -40,7 +40,7 @@ fn glue_item_parts() {
                 [("hreflang", "en"), ("href", "/hello")]
                     .map(|(key, value)| (key.into(), value.into()))
             )),
-            content: Some(Content::from("Hello World! World!")),
+            content: Some("Hello World! World!".into()),
         })
     );
 }
