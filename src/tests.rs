@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::{Content, Item, Render};
 use super::{Glue, ItemPart};
@@ -6,7 +6,6 @@ use super::{Glue, ItemPart};
 fn create_item_part_1() -> ItemPart<'static> {
     ItemPart {
         tag: Some("a".into()),
-        class: Some(HashSet::from(["button"].map(|name| name.into()))),
         attrs: Some(HashMap::from(
             [("hreflang", "en")].map(|(key, value)| (key.into(), value.into())),
         )),
@@ -16,7 +15,6 @@ fn create_item_part_1() -> ItemPart<'static> {
 fn create_item_part_2() -> ItemPart<'static> {
     ItemPart {
         tag: None,
-        class: Some(HashSet::from(["pretty"].map(|name| name.into()))),
         attrs: Some(HashMap::from(
             [("href", "/hello")].map(|(key, value)| (key.into(), value.into())),
         )),
@@ -35,7 +33,6 @@ fn glue_item_parts() {
         glued_item,
         Some(ItemPart {
             tag: Some("a".into()),
-            class: Some(HashSet::from(["pretty", "button"].map(|name| name.into()))),
             attrs: Some(HashMap::from(
                 [("hreflang", "en"), ("href", "/hello")]
                     .map(|(key, value)| (key.into(), value.into()))

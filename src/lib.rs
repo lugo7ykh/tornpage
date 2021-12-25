@@ -1,11 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Add,
-    usize,
-};
+use std::{collections::HashMap, ops::Add, usize};
 
 const EMPTY_ELEMENT_TAGS: [&str; 14] = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
@@ -29,7 +25,6 @@ impl<'a> Default for Content<'a> {
 #[derive(Default, Clone, PartialEq, Debug)]
 pub struct ItemPart<'a> {
     pub tag: Option<String>,
-    pub class: Option<HashSet<String>>,
     pub attrs: Option<HashMap<String, String>>,
     pub content: Option<Content<'a>>,
 }
@@ -215,15 +210,6 @@ impl<'a> Glue for Content<'a> {
     }
 }
 
-fn calc_class_capacity(parts: &ItemParts) -> usize {
-    parts
-        .iter()
-        .map(|part| match part.class {
-            Some(ref class) => class.len(),
-            None => 0,
-        })
-        .sum()
-}
 fn calc_attrs_capacity(parts: &ItemParts) -> usize {
     parts
         .iter()
@@ -237,16 +223,10 @@ fn calc_attrs_capacity(parts: &ItemParts) -> usize {
 impl<'a> Glue for ItemPart<'a> {
     fn glue(parts: &Vec<&Self>) -> Option<Self> {
         let mut tag = None;
-        let mut class = None;
         let mut attrs = None;
         let mut content_parts = None;
 
         for part in parts.iter().rev() {
-            if let Some(ref part_class) = part.class {
-                class
-                    .get_or_insert_with(|| HashSet::with_capacity(calc_class_capacity(parts)))
-                    .extend(part_class.clone().into_iter());
-            }
             if let Some(ref part_attrs) = part.attrs {
                 attrs
                     .get_or_insert_with(|| HashMap::with_capacity(calc_attrs_capacity(parts)))
@@ -264,12 +244,9 @@ impl<'a> Glue for ItemPart<'a> {
             }
         }
 
-        if tag.is_none() && class.is_none() && attrs.is_none() && content_parts.is_none() {
+        if tag.is_none() && attrs.is_none() && content_parts.is_none() {
             None
         } else {
-            if let Some(ref mut class) = class {
-                class.shrink_to_fit();
-            }
             if let Some(ref mut attrs) = attrs {
                 attrs.shrink_to_fit();
             }
@@ -286,7 +263,6 @@ impl<'a> Glue for ItemPart<'a> {
 
             Some(ItemPart {
                 tag,
-                class,
                 attrs,
                 content,
             })
@@ -329,7 +305,6 @@ impl<'a> Render for Item<'a> {
 
         let ItemPart {
             tag,
-            class,
             attrs,
             content,
             ..
@@ -348,17 +323,6 @@ impl<'a> Render for Item<'a> {
             Some(text) if text != "" => text,
             _ => "div",
         };
-        let class = match class {
-            Some(class) => format!(
-                " class=\"{}\"",
-                class
-                    .iter()
-                    .map(|n| n.clone())
-                    .reduce(|a, b| a + &format!(" {}", b))
-                    .unwrap_or_default(),
-            ),
-            _ => "".into(),
-        };
         let attrs = match attrs {
             Some(attrs) => attrs
                 .iter()
@@ -368,7 +332,7 @@ impl<'a> Render for Item<'a> {
             _ => "".into(),
         };
 
-        let start_tag = format!("<{}{}{}>", tag, class, attrs);
+        let start_tag = format!("<{}{}>", tag, attrs);
         let (content, end_tag) = if !EMPTY_ELEMENT_TAGS.contains(&tag) {
             (
                 match content {
