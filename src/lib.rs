@@ -1,63 +1,81 @@
 #[cfg(test)]
 mod tests;
 
-use std::{collections::HashMap, ops::Add, usize};
+use std::{collections::HashMap, fmt, mem, ops::Add, usize};
+
+const DEFAULT_TAG: &str = "div";
 
 const EMPTY_ELEMENT_TAGS: [&str; 14] = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
     "track", "wbr",
 ];
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum PagePart<'a> {
+    Item(Item<'a>),
+    Wrapper(Wrapper<'a>),
+    Body(Body<'a>),
+}
+impl<'a> Default for PagePart<'a> {
+    fn default() -> Self {
+        Self::Body(Default::default())
+    }
+}
+
+type Tag = String;
+type Attrs = HashMap<String, String>;
 type Slots = Vec<String>;
-type ItemList<'a> = HashMap<String, Item<'a>>;
+type ContentMap<'a> = HashMap<String, PagePart<'a>>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Content<'a> {
     Text(String),
-    Items(Option<Slots>, Option<ItemList<'a>>),
+    Parts(Option<Slots>, Option<ContentMap<'a>>),
 }
 impl<'a> Default for Content<'a> {
     fn default() -> Self {
-        Content::Items(None, None)
+        Self::Parts(None, None)
     }
 }
 
 #[derive(Default, Clone, PartialEq, Debug)]
-pub struct ItemPart<'a> {
-    pub tag: Option<String>,
-    pub attrs: Option<HashMap<String, String>>,
-    pub content: Option<Content<'a>>,
+pub struct Body<'a> {
+    attrs: Option<Attrs>,
+    content: Option<Content<'a>>,
 }
-type ItemParts<'a> = Vec<&'a ItemPart<'a>>;
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Item<'a> {
-    Part(&'a ItemPart<'a>),
-    Parts(ItemParts<'a>),
+pub enum Template<'a> {
+    Ref(&'a Body<'a>),
+    Custom(Body<'a>),
+}
+impl<'a> Default for Template<'a> {
+    fn default() -> Self {
+        Self::Custom(Default::default())
+    }
 }
 
-pub struct PageOptions {
-    title_separator: String,
-}
-pub struct PagePart<'a> {
-    pub title: Option<String>,
-    pub options: Option<PageOptions>,
-    pub head: Option<Content<'a>>,
-    pub body: Option<Content<'a>>,
-}
-type PageParts<'a> = Vec<&'a PagePart<'a>>;
-pub enum Page<'a> {
-    Part(&'a PagePart<'a>),
-    Parts(PageParts<'a>),
+#[derive(Default, Clone, PartialEq, Debug)]
+pub struct Component<'a> {
+    tag: Tag,
+    template: Option<Template<'a>>,
 }
 
-trait Glue {
-    fn glue(parts: &Vec<&Self>) -> Option<Self>
-    where
-        Self: Sized;
+#[derive(Clone, PartialEq, Debug)]
+pub enum Wrapper<'a> {
+    Component(&'a Component<'a>),
+    Custom(Component<'a>),
 }
-pub trait Render {
-    fn render(&self) -> String;
+impl<'a> Default for Wrapper<'a> {
+    fn default() -> Self {
+        Self::Custom(Default::default())
+    }
+}
+
+#[derive(Default, Clone, PartialEq, Debug)]
+pub struct Item<'a> {
+    wrapper: Wrapper<'a>,
+    body: Option<Body<'a>>,
 }
 
 impl<'a> From<&str> for Content<'a> {
@@ -65,292 +83,266 @@ impl<'a> From<&str> for Content<'a> {
         Content::Text(text.into())
     }
 }
-impl<'a, S: Into<String>> From<Vec<S>> for Content<'a> {
-    fn from(slots: Vec<S>) -> Self {
-        Content::Items(Some(slots.into_iter().map(|s| s.into()).collect()), None)
-    }
-}
+
 impl<'a, S, I, const N: usize> From<[(S, I); N]> for Content<'a>
 where
     S: Into<String>,
-    I: Into<Item<'a>>,
+    I: Into<PagePart<'a>>,
 {
-    fn from(items: [(S, I); N]) -> Self {
-        Content::Items(
+    fn from(parts: [(S, I); N]) -> Self {
+        Content::Parts(
             None,
             Some(
-                items
+                parts
                     .into_iter()
-                    .map(|(n, i)| (n.into(), i.into()))
+                    .map(|(s, i)| (s.into(), i.into()))
                     .collect(),
             ),
         )
     }
 }
-impl<'a, S, I, const N: usize> From<(Vec<S>, [(S, I); N])> for Content<'a>
-where
-    S: Into<String>,
-    I: Into<Item<'a>>,
-{
-    fn from((slots, items): (Vec<S>, [(S, I); N])) -> Self {
-        Content::Items(
-            match slots.into() {
-                Content::Items(slots, _) => slots,
-                _ => None,
-            },
-            match items.into() {
-                Content::Items(_, items) => items,
-                _ => None,
-            },
-        )
-    }
-}
 
-impl<'a> Item<'a> {
-    fn tag(&self) -> Option<&String> {
-        match self {
-            Item::Part(item) => item.tag.as_ref(),
-            Item::Parts(parts) => match parts
-                .iter()
-                .rev()
-                .skip_while(|part| part.tag.is_none())
-                .next()
-            {
-                Some(part) => part.tag.as_ref(),
-                _ => None,
-            },
-        }
-    }
-}
-
-impl<'a> From<&'a ItemPart<'a>> for Item<'a> {
-    fn from(part: &'a ItemPart) -> Self {
-        Item::Part(part)
-    }
-}
-impl<'a> From<ItemParts<'a>> for Item<'a> {
-    fn from(parts: ItemParts<'a>) -> Self {
-        Item::Parts(parts)
-    }
-}
-
-impl<'a, T: Into<Item<'a>>> Add<T> for Item<'a> {
+impl<'a> Add<&Body<'a>> for Item<'a> {
     type Output = Self;
 
-    fn add(self, other: T) -> Self::Output {
-        match self {
-            Item::Part(part) => match other.into() {
-                Item::Part(other_part) => {
-                    if part != other_part {
-                        Item::from(vec![part, other_part])
-                    } else {
-                        Item::from(part)
-                    }
-                }
-                Item::Parts(other_parts) => {
-                    let mut result = vec![part];
-                    result.extend(other_parts);
-                    Item::from(result)
-                }
+    fn add(self, other: &Body<'a>) -> Self::Output {
+        Self {
+            body: Some(self.body.unwrap_or_default() + other),
+            ..self
+        }
+    }
+}
+
+impl<'a> Add<&Wrapper<'a>> for Item<'a> {
+    type Output = Self;
+
+    fn add(self, other: &Wrapper<'a>) -> Self::Output {
+        Self {
+            wrapper: other.to_owned(),
+            ..self
+        }
+    }
+}
+
+impl<'a> Add<&Item<'a>> for Body<'a> {
+    type Output = Item<'a>;
+
+    fn add(self, other: &Item<'a>) -> Self::Output {
+        Item {
+            wrapper: other.wrapper.to_owned(),
+            body: Some(if let Some(ref other_body) = other.body {
+                self + other_body
+            } else {
+                self
+            }),
+        }
+    }
+}
+
+impl<'a> Add<&Body<'a>> for Body<'a> {
+    type Output = Body<'a>;
+
+    fn add(self, other: &Body<'a>) -> Self::Output {
+        Body {
+            attrs: if let Some(ref other_attrs) = other.attrs {
+                Some(
+                    self.attrs
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(
+                            other_attrs
+                                .into_iter()
+                                .map(|(k, v)| (k.to_owned(), v.to_owned())),
+                        )
+                        .collect(),
+                )
+            } else {
+                self.attrs
             },
-            Item::Parts(parts) => {
-                let mut result = parts;
-                match other.into() {
-                    Item::Part(other_part) => result.push(other_part),
-                    Item::Parts(other_parts) => result.extend(other_parts),
-                }
-                Item::from(result)
-            }
+
+            content: if let Some(ref other_content) = other.content {
+                Some(self.content.unwrap_or_default() + other_content)
+            } else {
+                self.content
+            },
         }
     }
 }
 
-impl<'a> Glue for Content<'a> {
-    fn glue(parts: &Vec<&Self>) -> Option<Self> {
-        let mut content = None;
+impl<'a> Add<&Wrapper<'a>> for Body<'a> {
+    type Output = Item<'a>;
 
-        for part in parts.iter().rev() {
-            match part {
-                Content::Text(part_text) => {
-                    if let Content::Text(text) = content.get_or_insert_with(|| "".into()) {
-                        text.insert_str(0, part_text);
-                    } else {
-                        break;
+    fn add(self, other: &Wrapper<'a>) -> Self::Output {
+        Item {
+            wrapper: other.to_owned(),
+            body: Some(self),
+        }
+    }
+}
+
+impl<'a> Add<&Item<'a>> for Wrapper<'a> {
+    type Output = Item<'a>;
+
+    fn add(self, other: &Item<'a>) -> Self::Output {
+        Item {
+            wrapper: self,
+            body: other.body.to_owned(),
+        }
+    }
+}
+
+impl<'a> Add<&Body<'a>> for Wrapper<'a> {
+    type Output = Item<'a>;
+
+    fn add(self, other: &Body<'a>) -> Self::Output {
+        Item {
+            wrapper: self,
+            body: Some(other.to_owned()),
+        }
+    }
+}
+
+impl<'a> Add<&PagePart<'a>> for PagePart<'a> {
+    type Output = Self;
+
+    fn add(self, other: &PagePart<'a>) -> Self::Output {
+        match self {
+            Self::Item(item) => Self::Item(match other {
+                Self::Item(other_item) => other_item.to_owned(),
+                Self::Body(other_body) => item + other_body,
+                Self::Wrapper(other_wrapper) => item + other_wrapper,
+            }),
+
+            Self::Body(body) => match other {
+                Self::Item(other_item) => Self::Item(body + other_item),
+                Self::Body(other_body) => Self::Body(body + other_body),
+                Self::Wrapper(other_wrapper) => Self::Item(body + other_wrapper),
+            },
+
+            Self::Wrapper(wrapper) => match other {
+                Self::Item(other_item) => Self::Item(wrapper + other_item),
+                Self::Body(other_body) => Self::Item(wrapper + other_body),
+                Self::Wrapper(other_wrapper) => Self::Wrapper(other_wrapper.to_owned()),
+            },
+        }
+    }
+}
+
+impl<'a> Add<&Content<'a>> for Content<'a> {
+    type Output = Self;
+
+    fn add(self, other: &Content<'a>) -> Self::Output {
+        match other {
+            Content::Text(other_text) => Content::Text(if let Content::Text(text) = self {
+                text + other_text
+            } else {
+                other_text.to_owned()
+            }),
+
+            Content::Parts(other_slots, other_parts) => {
+                if let Content::Parts(mut slots, mut parts) = self {
+                    slots = slots.or_else(|| other_slots.to_owned());
+
+                    if let Some(other_parts) = other_parts {
+                        if let Some(ref mut parts) = parts {
+                            other_parts.iter().for_each(|(other_name, other_part)| {
+                                if let Some(part) = parts.get_mut(other_name) {
+                                    *part = mem::take(part) + other_part;
+                                } else {
+                                    parts.insert(other_name.to_owned(), other_part.to_owned());
+                                };
+                            });
+                        };
                     }
-                }
-                Content::Items(part_slots, part_items) => {
-                    if let Content::Items(slots, items) =
-                        content.get_or_insert_with(|| Content::Items(None, None))
-                    {
-                        if slots.is_none() && part_slots.is_some() {
-                            *slots = part_slots.clone();
-                        }
-                        if let Some(part_items) = part_items {
-                            let items = items.get_or_insert_with(|| HashMap::new());
-
-                            for (id, part_item) in part_items {
-                                let item = items.remove(id);
-                                items.insert(
-                                    id.into(),
-                                    if let Some(item) = item {
-                                        part_item.clone() + item
-                                    } else {
-                                        part_item.clone()
-                                    },
-                                );
-                            }
-                        }
-                    } else {
-                        break;
-                    }
+                    Content::Parts(slots, parts)
+                } else {
+                    Content::Parts(other_slots.to_owned(), other_parts.to_owned())
                 }
             }
-        }
-        content
-    }
-}
-
-fn calc_attrs_capacity(parts: &ItemParts) -> usize {
-    parts
-        .iter()
-        .map(|part| match part.attrs {
-            Some(ref attrs) => attrs.len(),
-            None => 0,
-        })
-        .sum()
-}
-
-impl<'a> Glue for ItemPart<'a> {
-    fn glue(parts: &Vec<&Self>) -> Option<Self> {
-        let mut tag = None;
-        let mut attrs = None;
-        let mut content_parts = None;
-
-        for part in parts.iter().rev() {
-            if let Some(ref part_attrs) = part.attrs {
-                attrs
-                    .get_or_insert_with(|| HashMap::with_capacity(calc_attrs_capacity(parts)))
-                    .extend(part_attrs.clone().into_iter());
-            }
-            if let Some(ref part_content) = part.content {
-                content_parts
-                    .get_or_insert_with(|| Vec::with_capacity(parts.len()))
-                    .push(part_content);
-            }
-            if part.tag.is_some() {
-                tag = part.tag.clone();
-
-                break;
-            }
-        }
-
-        if tag.is_none() && attrs.is_none() && content_parts.is_none() {
-            None
-        } else {
-            if let Some(ref mut attrs) = attrs {
-                attrs.shrink_to_fit();
-            }
-            let content = match content_parts {
-                Some(mut content_parts)
-                    if tag.is_none()
-                        || !EMPTY_ELEMENT_TAGS.contains(&tag.as_ref().unwrap().as_str()) =>
-                {
-                    content_parts.reverse();
-                    Content::glue(&content_parts)
-                }
-                _ => None,
-            };
-
-            Some(ItemPart {
-                tag,
-                attrs,
-                content,
-            })
         }
     }
 }
 
-impl<'a> Render for Content<'a> {
-    fn render(&self) -> String {
+impl<'a> fmt::Display for Content<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut generated_slots = None;
 
-        let create_id_part = |id: &str| ItemPart {
+        let create_id_part = |id: &str| Body {
             attrs: Some(HashMap::from([("id".into(), id.into())])),
             ..Default::default()
         };
 
-        match self {
-            Self::Text(text) => text.clone(),
+        let content = match self {
+            Self::Text(text) => text.into(),
 
-            Self::Items(slots, items) => match items {
-                Some(items) => slots
-                    .as_ref()
-                    .unwrap_or_else(|| generated_slots.insert(items.keys().cloned().collect()))
-                    .iter()
-                    .filter_map(|name| match items.get(name) {
-                        Some(item) => Some(item.clone().add(&create_id_part(name)).render()),
-                        _ => None,
-                    })
-                    .reduce(|a, b| a + &b)
-                    .unwrap_or_default(),
-                None => "".into(),
-            },
-        }
+            Self::Parts(slots, Some(items)) => slots
+                .as_ref()
+                .unwrap_or_else(|| generated_slots.insert(items.keys().cloned().collect()))
+                .iter()
+                .filter_map(|name| match items.get(name) {
+                    Some(PagePart::Item(item)) => {
+                        Some(item.to_owned().add(&create_id_part(name)).to_string())
+                    }
+                    _ => None,
+                })
+                .reduce(|a, b| a + &b)
+                .unwrap_or_default(),
+            _ => "".into(),
+        };
+
+        write!(f, "{}", content)
     }
 }
 
-impl<'a> Render for Item<'a> {
-    fn render(&self) -> String {
-        let mut glued_item;
+impl<'a> fmt::Display for Item<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Item { wrapper, body } = self;
 
-        let ItemPart {
-            tag,
-            attrs,
-            content,
-            ..
-        } = match self {
-            Item::Part(part) => *part,
-            Item::Parts(item_parts) => {
-                glued_item = ItemPart::glue(item_parts);
-                glued_item.get_or_insert_with(Default::default)
-            }
+        let Component { tag, template } = match wrapper {
+            Wrapper::Component(component) => component,
+            Wrapper::Custom(custom) => custom,
         };
-        if tag.is_none() {
-            return "".into();
-        }
+        let tag = if tag != "" { tag } else { DEFAULT_TAG };
 
-        let tag = match tag {
-            Some(text) if text != "" => text,
-            _ => "div",
-        };
-        let attrs = match attrs {
-            Some(attrs) => attrs
+        let template = template.as_ref().map(|template| match template {
+            Template::Ref(template) => template,
+            Template::Custom(custom) => custom,
+        });
+
+        let mut glued_body = None;
+        let body = template
+            .and_then(|template| {
+                body.as_ref()
+                    .and_then(|body| Some(&*glued_body.insert(template.to_owned() + body)))
+                    .or(Some(template))
+            })
+            .or(body.as_ref());
+
+        let attrs = match body {
+            Some(Body {
+                attrs: Some(attrs), ..
+            }) => attrs
                 .iter()
                 .map(|(k, v)| format!(" {}=\"{}\"", k, v))
                 .reduce(|a, b| a + &b)
                 .unwrap_or_default(),
             _ => "".into(),
         };
-
         let start_tag = format!("<{}{}>", tag, attrs);
-        let (content, end_tag) = if !EMPTY_ELEMENT_TAGS.contains(&tag) {
-            (
-                match content {
-                    Some(content) => content.render(),
-                    _ => "".into(),
-                },
-                format!("</{}>", tag),
-            )
+
+        let content = match body {
+            Some(Body {
+                content: Some(content),
+                ..
+            }) if !EMPTY_ELEMENT_TAGS.contains(&tag) => content.to_string(),
+            _ => "".into(),
+        };
+        let end_tag = if !EMPTY_ELEMENT_TAGS.contains(&tag) {
+            format!("</{}>", tag)
         } else {
-            Default::default()
+            "".into()
         };
 
-        format!("{}{}{}", start_tag, content, end_tag)
-    }
-}
-
-impl<'a> Render for Page<'a> {
-    fn render(&self) -> String {
-        format!("")
+        write!(f, "{}{}{}", start_tag, content, end_tag)
     }
 }
