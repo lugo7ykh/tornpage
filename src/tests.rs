@@ -1,78 +1,79 @@
 use std::collections::HashMap;
 
-use super::{Content, Item, Render};
-use super::{Glue, ItemPart};
+use crate::{Body, Component, Content, Item, Wrapper};
 
-fn create_item_part_1() -> ItemPart<'static> {
-    ItemPart {
-        tag: Some("a".into()),
-        attrs: Some(HashMap::from(
-            [("hreflang", "en")].map(|(key, value)| (key.into(), value.into())),
-        )),
-        content: Some("Hello".into()),
+fn create_item_1() -> Item<'static> {
+    Item {
+        wrapper: Wrapper::Custom(Component {
+            tag: "a".into(),
+            template: None,
+        }),
+        body: Body {
+            attrs: HashMap::from(
+                [("hreflang", "en")].map(|(key, value)| (key.into(), value.into())),
+            )
+            .into(),
+            content: Content::from("Hello").into(),
+        }
+        .into(),
     }
 }
-fn create_item_part_2() -> ItemPart<'static> {
-    ItemPart {
-        tag: None,
-        attrs: Some(HashMap::from(
-            [("href", "/hello")].map(|(key, value)| (key.into(), value.into())),
-        )),
-        content: Some(" World!".into()),
+fn create_body_1() -> Body<'static> {
+    Body {
+        attrs: HashMap::from([("href", "/hello")].map(|(key, value)| (key.into(), value.into())))
+            .into(),
+        content: Content::from(" World!").into(),
     }
 }
 
 #[test]
-fn glue_item_parts() {
-    let item_part_1 = create_item_part_1();
-    let item_part_2 = create_item_part_2();
+fn glue_body_to_item() {
+    let item = create_item_1();
+    let body = create_body_1();
 
-    let glued_item = ItemPart::glue(&vec![&item_part_1, &item_part_2, &item_part_2]);
+    let glued_item = item + &body + &create_body_1();
 
     assert_eq!(
         glued_item,
-        Some(ItemPart {
-            tag: Some("a".into()),
-            attrs: Some(HashMap::from(
-                [("hreflang", "en"), ("href", "/hello")]
-                    .map(|(key, value)| (key.into(), value.into()))
-            )),
-            content: Some("Hello World! World!".into()),
-        })
+        Item {
+            wrapper: Wrapper::Custom(Component {
+                tag: "a".into(),
+                template: None,
+            }),
+            body: Body {
+                attrs: HashMap::from(
+                    [("hreflang", "en"), ("href", "/hello")]
+                        .map(|(key, value)| (key.into(), value.into())),
+                )
+                .into(),
+                content: Content::from("Hello World! World!").into(),
+            }
+            .into(),
+        }
     );
 }
 
 #[test]
 fn render_item_part_1() {
-    let rendered_item = Item::from(&create_item_part_1()).render();
+    let rendered_item = create_item_1().to_string();
 
-    assert_eq!(
-        rendered_item,
-        "<a class=\"button\" hreflang=\"en\">Hello</a>"
-    )
-}
-
-#[test]
-fn render_item_part_2() {
-    let rendered_item = Item::from(&create_item_part_2()).render();
-
-    assert_eq!(rendered_item, "")
+    assert_eq!(rendered_item, "<a hreflang=\"en\">Hello</a>")
 }
 
 #[test]
 fn render_glued_item() {
-    let glued_item =
-        ItemPart::glue(&vec![&create_item_part_1(), &create_item_part_2()]).expect("can't glue");
-    let rendered_item = Item::from(&glued_item).render();
+    let glued_item = create_item_1() + &create_body_1();
+    let rendered_item = glued_item.to_string();
 
     assert!(
-        rendered_item
-            == "<a class=\"pretty button\" hreflang=\"en\" href=\"/hello\">Hello World!</a>"
-            || rendered_item
-                == "<a class=\"pretty button\" href=\"/hello\" hreflang=\"en\">Hello World!</a>"
-            || rendered_item
-                == "<a class=\"button pretty\" hreflang=\"en\" href=\"/hello\">Hello World!</a>"
-            || rendered_item
-                == "<a class=\"button pretty\" href=\"/hello\" hreflang=\"en\">Hello World!</a>"
+        rendered_item == "<a hreflang=\"en\" href=\"/hello\">Hello World!</a>"
+            || rendered_item == "<a href=\"/hello\" hreflang=\"en\">Hello World!</a>"
     )
+    // == "<a class=\"pretty button\" hreflang=\"en\" href=\"/hello\">Hello World!</a>"
+    // || rendered_item
+    //     == "<a class=\"pretty button\" href=\"/hello\" hreflang=\"en\">Hello World!</a>"
+    // || rendered_item
+    //     == "<a class=\"button pretty\" hreflang=\"en\" href=\"/hello\">Hello World!</a>"
+    // || rendered_item
+    //     == "<a class=\"button pretty\" href=\"/hello\" hreflang=\"en\">Hello World!</a>"
 }
