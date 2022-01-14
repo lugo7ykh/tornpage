@@ -1,7 +1,12 @@
 #[cfg(test)]
 mod tests;
 
-use std::{collections::HashMap, fmt, mem, ops::Add, usize};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt, mem,
+    ops::Add,
+    usize,
+};
 
 const DEFAULT_TAG: &str = "div";
 
@@ -22,8 +27,21 @@ impl<'a> Default for PagePart<'a> {
     }
 }
 
+type AttrName = String;
+
+#[derive(Clone, PartialEq, Debug)]
+enum AttrValue {
+    One(String),
+    Set(HashSet<String>),
+}
+impl<'a> Default for AttrValue {
+    fn default() -> Self {
+        Self::One(Default::default())
+    }
+}
+type Attrs = HashMap<AttrName, AttrValue>;
+
 type Tag = String;
-type Attrs = HashMap<String, String>;
 type Slots = Vec<String>;
 type ContentMap<'a> = HashMap<String, PagePart<'a>>;
 
@@ -78,9 +96,21 @@ pub struct Item<'a> {
     body: Option<Body<'a>>,
 }
 
+impl From<&str> for AttrValue {
+    fn from(value: &str) -> Self {
+        Self::One(value.into())
+    }
+}
+
+impl<const N: usize> From<[&str; N]> for AttrValue {
+    fn from(values: [&str; N]) -> Self {
+        Self::Set(values.into_iter().map(|v| v.into()).collect())
+    }
+}
+
 impl<'a> From<&str> for Content<'a> {
     fn from(text: &str) -> Self {
-        Content::Text(text.into())
+        Self::Text(text.into())
     }
 }
 
@@ -260,6 +290,21 @@ impl<'a> Add<&Content<'a>> for Content<'a> {
                 }
             }
         }
+    }
+}
+
+impl<'a> fmt::Display for AttrValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            Self::One(value) => value.to_owned(),
+            Self::Set(values) => values
+                .iter()
+                .map(|v| v.to_owned())
+                .reduce(|a, b| a + &b)
+                .unwrap_or_default(),
+        };
+
+        write!(f, "{}", value)
     }
 }
 
