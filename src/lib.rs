@@ -63,7 +63,7 @@ pub struct Component<'a> {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Wrapper<'a> {
-    Component(&'a Component<'a>),
+    Ref(&'a Component<'a>),
     Custom(Component<'a>),
 }
 impl<'a> Default for Wrapper<'a> {
@@ -299,7 +299,7 @@ impl<'a> fmt::Display for Item<'a> {
         let Item { wrapper, body } = self;
 
         let Component { tag, template } = match wrapper {
-            Wrapper::Component(component) => component,
+            Wrapper::Ref(component) => component,
             Wrapper::Custom(custom) => custom,
         };
         let tag = if tag != "" { tag } else { DEFAULT_TAG };
