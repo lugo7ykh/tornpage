@@ -299,14 +299,12 @@ impl<'a> fmt::Display for Item<'a> {
         let Item { wrapper, body } = self;
 
         let Component { tag, template } = match wrapper {
-            Wrapper::Ref(component) => component,
-            Wrapper::Custom(custom) => custom,
+            &Wrapper::Ref(component) | Wrapper::Custom(component) => component,
         };
         let tag = if tag != "" { tag } else { DEFAULT_TAG };
 
         let template = template.as_ref().map(|template| match template {
-            Template::Ref(template) => template,
-            Template::Custom(custom) => custom,
+            &Template::Ref(template) | Template::Custom(template) => template,
         });
 
         let mut glued_body = None;
