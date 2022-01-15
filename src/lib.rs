@@ -3,7 +3,8 @@ mod tests;
 
 use std::{
     collections::{HashMap, HashSet},
-    fmt, mem,
+    fmt,
+    mem::{self, take},
     ops::Add,
     usize,
 };
@@ -207,17 +208,17 @@ impl<'a> Add<&Body<'a>> for Body<'a> {
     fn add(self, other: &Body<'a>) -> Self::Output {
         Body {
             attrs: if let Some(ref other_attrs) = other.attrs {
-                Some(
-                    self.attrs
-                        .unwrap_or_default()
-                        .into_iter()
-                        .chain(
-                            other_attrs
-                                .into_iter()
-                                .map(|(k, v)| (k.to_owned(), v.to_owned())),
-                        )
-                        .collect(),
-                )
+                let mut attrs = self.attrs.unwrap_or_default();
+                other_attrs
+                    .into_iter()
+                    .for_each(|(other_name, other_value)| {
+                        if let Some(value) = attrs.get_mut(other_name) {
+                            *value = take(value) + other_value;
+                        } else {
+                            attrs.insert(other_name.clone(), other_value.clone());
+                        }
+                    });
+                Some(attrs)
             } else {
                 self.attrs
             },
