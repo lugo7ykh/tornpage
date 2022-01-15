@@ -132,6 +132,38 @@ where
     }
 }
 
+impl Add<&AttrValue> for AttrValue {
+    type Output = Self;
+
+    fn add(self, other: &AttrValue) -> Self::Output {
+        match other {
+            Self::One(other_one) => match self {
+                Self::One(one) => {
+                    if one == *other_one {
+                        Self::One(one)
+                    } else {
+                        Self::Set([one, other_one.clone()].into())
+                    }
+                }
+                Self::Set(mut set) => {
+                    set.insert(other_one.clone());
+
+                    Self::Set(set)
+                }
+            },
+            Self::Set(other_set) => {
+                let mut set = match self {
+                    Self::One(one) => [one].into(),
+                    Self::Set(set) => set,
+                };
+                set.extend(other_set.iter().cloned());
+
+                Self::Set(set)
+            }
+        }
+    }
+}
+
 impl<'a> Add<&Body<'a>> for Item<'a> {
     type Output = Self;
 
