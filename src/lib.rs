@@ -264,17 +264,6 @@ impl<'a> Add<&Body<'a>> for Wrapper<'a> {
     }
 }
 
-impl<'a> Add<&Item<'a>> for Wrapper<'a> {
-    type Output = Item<'a>;
-
-    fn add(self, other: &Item<'a>) -> Self::Output {
-        Item {
-            wrapper: self,
-            body: other.body.clone(),
-        }
-    }
-}
-
 impl<'a> Add<&Body<'a>> for Item<'a> {
     type Output = Self;
 
@@ -286,28 +275,11 @@ impl<'a> Add<&Body<'a>> for Item<'a> {
     }
 }
 
-impl<'a> Add<&Wrapper<'a>> for Item<'a> {
-    type Output = Self;
-
-    fn add(self, other: &Wrapper<'a>) -> Self::Output {
-        Self {
-            wrapper: other.clone(),
-            ..self
-        }
-    }
-}
-
 impl<'a> Add<&PagePart<'a>> for PagePart<'a> {
     type Output = Self;
 
     fn add(self, other: &PagePart<'a>) -> Self::Output {
         match self {
-            Self::Item(item) => Self::Item(match other {
-                Self::Body(other_body) => item + other_body,
-                Self::Wrapper(other_wrapper) => item + other_wrapper,
-                Self::Item(other_item) => other_item.clone(),
-            }),
-
             Self::Body(body) => match other {
                 Self::Body(other_body) => Self::Body(body + other_body),
                 Self::Wrapper(other_wrapper) => Self::Item(body + other_wrapper),
@@ -316,9 +288,13 @@ impl<'a> Add<&PagePart<'a>> for PagePart<'a> {
 
             Self::Wrapper(wrapper) => match other {
                 Self::Body(other_body) => Self::Item(wrapper + other_body),
-                Self::Wrapper(other_wrapper) => Self::Wrapper(other_wrapper.clone()),
-                Self::Item(other_item) => Self::Item(wrapper + other_item),
+                _ => Self::Wrapper(wrapper),
             },
+
+            Self::Item(item) => Self::Item(match other {
+                Self::Body(other_body) => item + other_body,
+                _ => item,
+            }),
         }
     }
 }
