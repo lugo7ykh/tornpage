@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{Body, Component, Content, Item, Wrapper};
+use crate::{Attrs, Body, Component, Item, Wrapper};
 
 fn create_item_1() -> Item<'static> {
     Item {
@@ -9,20 +7,16 @@ fn create_item_1() -> Item<'static> {
             template: None,
         }),
         body: Body {
-            attrs: HashMap::from(
-                [("hreflang", "en")].map(|(key, value)| (key.into(), value.into())),
-            )
-            .into(),
-            content: Content::from("Hello").into(),
+            attrs: Some(Attrs::new() + ("class", "button") + ("hreflang", "en")),
+            content: Some("Hello".into()),
         }
         .into(),
     }
 }
 fn create_body_1() -> Body<'static> {
     Body {
-        attrs: HashMap::from([("href", "/hello")].map(|(key, value)| (key.into(), value.into())))
-            .into(),
-        content: Content::from(" World!").into(),
+        attrs: Some(Attrs::new() + ("class", "pretty") + ("href", "/hello")),
+        content: Some(" World!".into()),
     }
 }
 
@@ -41,12 +35,13 @@ fn glue_body_to_item() {
                 template: None,
             }),
             body: Body {
-                attrs: HashMap::from(
-                    [("hreflang", "en"), ("href", "/hello")]
-                        .map(|(key, value)| (key.into(), value.into())),
-                )
-                .into(),
-                content: Content::from("Hello World! World!").into(),
+                attrs: Some(
+                    Attrs::new()
+                        + ("class", ["pretty", "button"])
+                        + ("hreflang", "en")
+                        + ("href", "/hello")
+                ),
+                content: Some("Hello World! World!".into()),
             }
             .into(),
         }
@@ -57,23 +52,8 @@ fn glue_body_to_item() {
 fn render_item_part_1() {
     let rendered_item = create_item_1().to_string();
 
-    assert_eq!(rendered_item, "<a hreflang=\"en\">Hello</a>")
-}
-
-#[test]
-fn render_glued_item() {
-    let glued_item = create_item_1() + &create_body_1();
-    let rendered_item = glued_item.to_string();
-
     assert!(
-        rendered_item == "<a hreflang=\"en\" href=\"/hello\">Hello World!</a>"
-            || rendered_item == "<a href=\"/hello\" hreflang=\"en\">Hello World!</a>"
+        rendered_item == "<a class=\"button\" hreflang=\"en\">Hello</a>"
+            || rendered_item == "<a hreflang=\"en\" class=\"button\">Hello</a>"
     )
-    // == "<a class=\"pretty button\" hreflang=\"en\" href=\"/hello\">Hello World!</a>"
-    // || rendered_item
-    //     == "<a class=\"pretty button\" href=\"/hello\" hreflang=\"en\">Hello World!</a>"
-    // || rendered_item
-    //     == "<a class=\"button pretty\" hreflang=\"en\" href=\"/hello\">Hello World!</a>"
-    // || rendered_item
-    //     == "<a class=\"button pretty\" href=\"/hello\" hreflang=\"en\">Hello World!</a>"
 }
