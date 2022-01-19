@@ -5,7 +5,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt,
     mem::{self, take},
-    ops::Add,
+    ops::{Add, Deref, DerefMut},
     usize,
 };
 
@@ -26,7 +26,27 @@ impl<'a> Default for AttrValue {
         Self::One(Default::default())
     }
 }
-type Attrs = HashMap<String, AttrValue>;
+
+#[derive(Default, Clone, PartialEq, Debug)]
+struct Attrs(HashMap<String, AttrValue>);
+
+impl Attrs {
+    fn new() -> Self {
+        Self(Default::default())
+    }
+}
+impl Deref for Attrs {
+    type Target = HashMap<String, AttrValue>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Attrs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 type Slots = Vec<String>;
 type ContentMap<'a> = HashMap<String, PagePart<'a>>;
@@ -102,7 +122,13 @@ impl From<&str> for AttrValue {
 
 impl<const N: usize> From<[&str; N]> for AttrValue {
     fn from(values: [&str; N]) -> Self {
-        Self::Set(values.into_iter().map(|v| v.into()).collect())
+        Self::Set(values.map(|v| v.into()).into())
+    }
+}
+
+impl<T: Into<AttrValue>, const N: usize> From<[(&str, T); N]> for Attrs {
+    fn from(attrs: [(&str, T); N]) -> Self {
+        attrs.into_iter().fold(Attrs::new(), |acc, x| acc + x)
     }
 }
 
@@ -162,6 +188,38 @@ impl Add<&AttrValue> for AttrValue {
     }
 }
 
+impl<N: Into<String>, V: Into<AttrValue>> Add<(N, V)> for Attrs {
+    type Output = Self;
+
+    fn add(self, entry: (N, V)) -> Self::Output {
+        let mut attrs = self;
+        let name = entry.0.into();
+        let value = entry.1.into();
+
+        if let Some(current_value) = attrs.get_mut(&name) {
+            *current_value = take(current_value) + &value;
+        } else {
+            attrs.insert(name, value);
+        }
+
+        attrs
+    }
+}
+
+impl Add<&Attrs> for Attrs {
+    type Output = Self;
+
+    fn add(self, other: &Self) -> Self::Output {
+        let mut attrs = self;
+
+        other.iter().for_each(|(other_name, other_value)| {
+            attrs = take(&mut attrs) + (other_name, other_value.clone());
+        });
+
+        attrs
+    }
+}
+
 impl<'a> Add<&Content<'a>> for Content<'a> {
     type Output = Self;
 
@@ -203,21 +261,10 @@ impl<'a> Add<&Body<'a>> for Body<'a> {
     fn add(self, other: &Body<'a>) -> Self::Output {
         Body {
             attrs: if let Some(ref other_attrs) = other.attrs {
-                let mut attrs = self.attrs.unwrap_or_default();
-                other_attrs
-                    .into_iter()
-                    .for_each(|(other_name, other_value)| {
-                        if let Some(value) = attrs.get_mut(other_name) {
-                            *value = take(value) + other_value;
-                        } else {
-                            attrs.insert(other_name.clone(), other_value.clone());
-                        }
-                    });
-                Some(attrs)
+                Some(self.attrs.unwrap_or_default() + other_attrs)
             } else {
                 self.attrs
             },
-
             content: if let Some(ref other_content) = other.content {
                 Some(self.content.unwrap_or_default() + other_content)
             } else {
@@ -319,7 +366,7 @@ impl<'a> fmt::Display for Content<'a> {
         let mut generated_slots = None;
 
         let create_id_part = |id: &str| Body {
-            attrs: Some(HashMap::from([("id".into(), id.into())])),
+            attrs: Some([("id", id)].into()),
             ..Default::default()
         };
 
