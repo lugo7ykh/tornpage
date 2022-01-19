@@ -353,7 +353,7 @@ impl<'a> fmt::Display for AttrValue {
             Self::Set(values) => values
                 .iter()
                 .map(|v| v.clone())
-                .reduce(|a, b| a + &b)
+                .reduce(|a, b| format!("{a} {b}"))
                 .unwrap_or_default(),
         };
 
