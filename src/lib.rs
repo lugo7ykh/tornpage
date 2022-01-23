@@ -17,7 +17,7 @@ const EMPTY_ELEMENT_TAGS: [&str; 14] = [
 ];
 
 #[derive(Clone, PartialEq, Debug)]
-enum AttrValue {
+pub enum AttrValue {
     One(String),
     Set(HashSet<String>),
 }
@@ -28,10 +28,10 @@ impl<'a> Default for AttrValue {
 }
 
 #[derive(Default, Clone, PartialEq, Debug)]
-struct Attrs(HashMap<String, AttrValue>);
+pub struct Attrs(HashMap<String, AttrValue>);
 
 impl Attrs {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self(Default::default())
     }
 }
