@@ -48,8 +48,20 @@ impl DerefMut for Attrs {
     }
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum ContentPart<'a> {
+    Body(Body<'a>),
+    Wrapper(Wrapper<'a>),
+    Item(Item<'a>),
+}
+impl<'a> Default for ContentPart<'a> {
+    fn default() -> Self {
+        Self::Body(Default::default())
+    }
+}
+
 type Slots = Vec<String>;
-type ContentMap<'a> = HashMap<String, PagePart<'a>>;
+type ContentMap<'a> = HashMap<String, ContentPart<'a>>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Content<'a> {
@@ -102,18 +114,6 @@ pub struct Item<'a> {
     body: Option<Body<'a>>,
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum PagePart<'a> {
-    Body(Body<'a>),
-    Wrapper(Wrapper<'a>),
-    Item(Item<'a>),
-}
-impl<'a> Default for PagePart<'a> {
-    fn default() -> Self {
-        Self::Body(Default::default())
-    }
-}
-
 impl From<&str> for AttrValue {
     fn from(value: &str) -> Self {
         Self::One(value.into())
@@ -141,7 +141,7 @@ impl<'a> From<&str> for Content<'a> {
 impl<'a, S, I, const N: usize> From<[(S, I); N]> for Content<'a>
 where
     S: Into<String>,
-    I: Into<PagePart<'a>>,
+    I: Into<ContentPart<'a>>,
 {
     fn from(parts: [(S, I); N]) -> Self {
         Content::Parts(
@@ -322,10 +322,10 @@ impl<'a> Add<&Body<'a>> for Item<'a> {
     }
 }
 
-impl<'a> Add<&PagePart<'a>> for PagePart<'a> {
+impl<'a> Add<&ContentPart<'a>> for ContentPart<'a> {
     type Output = Self;
 
-    fn add(self, other: &PagePart<'a>) -> Self::Output {
+    fn add(self, other: &ContentPart<'a>) -> Self::Output {
         match self {
             Self::Body(body) => match other {
                 Self::Body(other_body) => Self::Body(body + other_body),
@@ -378,7 +378,7 @@ impl<'a> fmt::Display for Content<'a> {
                 .unwrap_or_else(|| generated_slots.insert(items.keys().cloned().collect()))
                 .iter()
                 .filter_map(|name| match items.get(name) {
-                    Some(PagePart::Item(item)) => {
+                    Some(ContentPart::Item(item)) => {
                         Some(item.clone().add(&create_id_part(name)).to_string())
                     }
                     _ => None,
