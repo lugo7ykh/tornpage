@@ -172,6 +172,23 @@ where
     }
 }
 
+impl<'a> From<Attrs> for Body<'a> {
+    fn from(attrs: Attrs) -> Self {
+        Self {
+            attrs: Some(attrs),
+            ..Default::default()
+        }
+    }
+}
+impl<'a> From<Content<'a>> for Body<'a> {
+    fn from(content: Content<'a>) -> Self {
+        Self {
+            content: Some(content),
+            ..Default::default()
+        }
+    }
+}
+
 impl Add<&AttrValue> for AttrValue {
     type Output = Self;
 
