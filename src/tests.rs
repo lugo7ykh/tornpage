@@ -1,55 +1,32 @@
-use crate::{Attrs, Body, Component, Item, Wrapper};
+use crate::{Attrs, Body, Content, Item};
 
 fn create_item_1() -> Item<'static> {
-    Item {
-        wrapper: Wrapper::Custom(Component {
-            tag: "a".into(),
-            template: None,
-        }),
-        body: Body {
-            attrs: Some(Attrs::new() + ("class", "button") + ("hreflang", "en")),
-            content: Some("Hello".into()),
-        }
-        .into(),
-    }
+    Item::new("a")
+        + (Attrs::new() + ("class", "button") + ("hreflang", "en"))
+        + Content::from("Hello")
 }
+
 fn create_body_1() -> Body<'static> {
-    Body {
-        attrs: Some(Attrs::new() + ("class", "pretty") + ("href", "/hello")),
-        content: Some(" World!".into()),
-    }
+    Body::from(Attrs::new() + ("class", "pretty") + ("href", "/hello")) + Content::from(" World!")
 }
 
 #[test]
-fn glue_body_to_item() {
-    let item = create_item_1();
-    let body = create_body_1();
-
-    let glued_item = item + &body + &create_body_1();
+fn add_body_to_item() {
+    let glued_item = create_item_1() + &create_body_1() + &create_body_1();
 
     assert_eq!(
         glued_item,
-        Item {
-            wrapper: Wrapper::Custom(Component {
-                tag: "a".into(),
-                template: None,
-            }),
-            body: Body {
-                attrs: Some(
-                    Attrs::new()
-                        + ("class", ["pretty", "button"])
-                        + ("hreflang", "en")
-                        + ("href", "/hello")
-                ),
-                content: Some("Hello World! World!".into()),
-            }
-            .into(),
-        }
+        Item::new("a")
+            + (Attrs::new()
+                + ("class", ["pretty", "button"])
+                + ("hreflang", "en")
+                + ("href", "/hello"))
+            + Content::from("Hello World! World!"),
     );
 }
 
 #[test]
-fn render_item_part_1() {
+fn display_item_1() {
     let rendered_item = create_item_1().to_string();
 
     assert!(
