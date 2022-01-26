@@ -271,6 +271,36 @@ impl<'a> Add<&Content<'a>> for Content<'a> {
     }
 }
 
+impl<'a> Add<Attrs> for Body<'a> {
+    type Output = Self;
+
+    fn add(self, other_attrs: Attrs) -> Self::Output {
+        Self {
+            attrs: Some(if let Some(attrs) = self.attrs {
+                attrs + &other_attrs
+            } else {
+                other_attrs
+            }),
+            ..self
+        }
+    }
+}
+
+impl<'a> Add<Content<'a>> for Body<'a> {
+    type Output = Self;
+
+    fn add(self, other_content: Content<'a>) -> Self::Output {
+        Self {
+            content: Some(if let Some(content) = self.content {
+                content + &other_content
+            } else {
+                other_content
+            }),
+            ..self
+        }
+    }
+}
+
 impl<'a> Add<&Body<'a>> for Body<'a> {
     type Output = Body<'a>;
 
@@ -333,6 +363,28 @@ impl<'a> Add<&Body<'a>> for Item<'a> {
     fn add(self, other: &Body<'a>) -> Self::Output {
         Self {
             body: Some(self.body.unwrap_or_default() + other),
+            ..self
+        }
+    }
+}
+
+impl<'a> Add<Attrs> for Item<'a> {
+    type Output = Self;
+
+    fn add(self, other_attrs: Attrs) -> Self::Output {
+        Self {
+            body: Some(self.body.unwrap_or_default() + other_attrs),
+            ..self
+        }
+    }
+}
+
+impl<'a> Add<Content<'a>> for Item<'a> {
+    type Output = Self;
+
+    fn add(self, other_content: Content<'a>) -> Self::Output {
+        Self {
+            body: Some(self.body.unwrap_or_default() + other_content),
             ..self
         }
     }
