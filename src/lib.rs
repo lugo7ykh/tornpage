@@ -96,6 +96,14 @@ pub struct Component<'a> {
     tag: String,
     template: Option<Template<'a>>,
 }
+impl<'a> Component<'a> {
+    pub fn new(tag: &str) -> Self {
+        Self {
+            tag: tag.into(),
+            ..Default::default()
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Wrapper<'a> {
@@ -112,6 +120,14 @@ impl<'a> Default for Wrapper<'a> {
 pub struct Item<'a> {
     wrapper: Wrapper<'a>,
     body: Option<Body<'a>>,
+}
+impl<'a> Item<'a> {
+    pub fn new(tag: &str) -> Self {
+        Self {
+            wrapper: Wrapper::Custom(Component::new(tag)),
+            ..Default::default()
+        }
+    }
 }
 
 impl From<&str> for AttrValue {
