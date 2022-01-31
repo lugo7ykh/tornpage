@@ -4,7 +4,7 @@ mod tests;
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    mem::{self, take},
+    mem::take,
     ops::{Add, Deref, DerefMut},
     usize,
 };
@@ -60,16 +60,34 @@ impl<'a> Default for ContentPart<'a> {
     }
 }
 
-type Slots = Vec<String>;
-type ContentMap<'a> = HashMap<String, ContentPart<'a>>;
+#[derive(Clone, PartialEq, Debug)]
+pub enum Layout {
+    Fixed(Vec<String>),
+    Extensible(Vec<String>),
+}
+impl<'a> Default for Layout {
+    fn default() -> Self {
+        Self::Extensible(Default::default())
+    }
+}
+impl Deref for Layout {
+    type Target = Vec<String>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Fixed(layout) | Self::Extensible(layout) => layout,
+        }
+    }
+}
+type PartsMap<'a> = HashMap<String, ContentPart<'a>>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Content<'a> {
     Text(String),
-    Parts(Option<Slots>, Option<ContentMap<'a>>),
+    Parts(Option<Layout>, Option<PartsMap<'a>>),
 }
-impl<'a> Default for Content<'a> {
-    fn default() -> Self {
+impl<'a> Content<'a> {
+    pub fn new() -> Self {
         Self::Parts(None, None)
     }
 }
@@ -142,9 +160,11 @@ impl<const N: usize> From<[&str; N]> for AttrValue {
     }
 }
 
-impl<T: Into<AttrValue>, const N: usize> From<[(&str, T); N]> for Attrs {
-    fn from(attrs: [(&str, T); N]) -> Self {
-        attrs.into_iter().fold(Attrs::new(), |acc, x| acc + x)
+impl<N: Into<String>, V: Into<AttrValue>> FromIterator<(N, V)> for Attrs {
+    fn from_iter<T: IntoIterator<Item = (N, V)>>(entries: T) -> Self {
+        entries
+            .into_iter()
+            .fold(Attrs::new(), |attrs, entry| attrs + entry)
     }
 }
 
@@ -154,21 +174,25 @@ impl<'a> From<&str> for Content<'a> {
     }
 }
 
-impl<'a, S, I, const N: usize> From<[(S, I); N]> for Content<'a>
-where
-    S: Into<String>,
-    I: Into<ContentPart<'a>>,
-{
-    fn from(parts: [(S, I); N]) -> Self {
-        Content::Parts(
-            None,
-            Some(
-                parts
-                    .into_iter()
-                    .map(|(s, i)| (s.into(), i.into()))
-                    .collect(),
-            ),
-        )
+impl<'a, const N: usize> From<[&str; N]> for Content<'a> {
+    fn from(layout: [&str; N]) -> Self {
+        let content = layout.into_iter().fold(Content::new(), |content, slot| {
+            content + (slot, ContentPart::Body(Default::default()))
+        });
+
+        if let Content::Parts(Some(Layout::Extensible(layout)), parts) = content {
+            Content::Parts(Some(Layout::Fixed(layout)), parts)
+        } else {
+            Content::Parts(Some(Layout::Fixed(vec![])), None)
+        }
+    }
+}
+
+impl<'a, S: Into<String>, P: Into<ContentPart<'a>>> FromIterator<(S, P)> for Content<'a> {
+    fn from_iter<T: IntoIterator<Item = (S, P)>>(entries: T) -> Self {
+        entries
+            .into_iter()
+            .fold(Content::new(), |content, entry| content + entry)
     }
 }
 
@@ -221,21 +245,27 @@ impl Add<&AttrValue> for AttrValue {
     }
 }
 
-impl<N: Into<String>, V: Into<AttrValue>> Add<(N, V)> for Attrs {
+impl Add<(&String, &AttrValue)> for Attrs {
     type Output = Self;
 
-    fn add(self, entry: (N, V)) -> Self::Output {
+    fn add(self, (name, value): (&String, &AttrValue)) -> Self::Output {
         let mut attrs = self;
-        let name = entry.0.into();
-        let value = entry.1.into();
 
-        if let Some(current_value) = attrs.get_mut(&name) {
-            *current_value = take(current_value) + &value;
+        if let Some(current_value) = attrs.get_mut(name) {
+            *current_value = take(current_value) + value;
         } else {
-            attrs.insert(name, value);
+            attrs.insert(name.clone(), value.clone());
         }
 
         attrs
+    }
+}
+
+impl<N: Into<String>, V: Into<AttrValue>> Add<(N, V)> for Attrs {
+    type Output = Self;
+
+    fn add(self, (name, value): (N, V)) -> Self::Output {
+        self + (&name.into(), &value.into())
     }
 }
 
@@ -243,13 +273,54 @@ impl Add<&Attrs> for Attrs {
     type Output = Self;
 
     fn add(self, other: &Self) -> Self::Output {
-        let mut attrs = self;
+        other.iter().fold(self, |attrs, entry| attrs + entry)
+    }
+}
 
-        other.iter().for_each(|(other_name, other_value)| {
-            attrs = take(&mut attrs) + (other_name, other_value.clone());
-        });
+impl<'a> Add<&str> for Content<'a> {
+    type Output = Self;
 
-        attrs
+    fn add(self, text: &str) -> Self::Output {
+        if let Content::Text(current_text) = self {
+            Self::Text(current_text + text)
+        } else {
+            self
+        }
+    }
+}
+
+impl<'a> Add<(&String, &ContentPart<'a>)> for Content<'a> {
+    type Output = Self;
+
+    fn add(self, (slot, part): (&String, &ContentPart<'a>)) -> Self::Output {
+        if let Content::Parts(mut layout, mut parts) = self {
+            if let Layout::Extensible(layout) = layout.get_or_insert_with(Default::default) {
+                let parts = parts.get_or_insert_with(Default::default);
+
+                if !parts.contains_key(slot) {
+                    parts.insert(slot.clone(), Default::default());
+                    layout.push(slot.clone())
+                }
+            }
+
+            if let Some(ref mut parts) = parts {
+                if let Some(current_part) = parts.get_mut(slot) {
+                    *current_part = take(current_part) + part;
+                }
+            }
+
+            Self::Parts(layout, parts)
+        } else {
+            self
+        }
+    }
+}
+
+impl<'a, S: Into<String>, P: Into<ContentPart<'a>>> Add<(S, P)> for Content<'a> {
+    type Output = Self;
+
+    fn add(self, (slot, part): (S, P)) -> Self::Output {
+        self + (&slot.into(), &part.into())
     }
 }
 
@@ -258,32 +329,15 @@ impl<'a> Add<&Content<'a>> for Content<'a> {
 
     fn add(self, other: &Content<'a>) -> Self::Output {
         match other {
-            Content::Text(other_text) => Content::Text(if let Content::Text(text) = self {
-                text + other_text
-            } else {
-                other_text.clone()
-            }),
+            Content::Text(text) => self + text.as_str(),
 
-            Content::Parts(other_slots, other_parts) => {
-                if let Content::Parts(mut slots, mut parts) = self {
-                    slots = slots.or_else(|| other_slots.clone());
-
-                    if let Some(other_parts) = other_parts {
-                        if let Some(ref mut parts) = parts {
-                            other_parts.iter().for_each(|(other_name, other_part)| {
-                                if let Some(part) = parts.get_mut(other_name) {
-                                    *part = mem::take(part) + other_part;
-                                } else {
-                                    parts.insert(other_name.clone(), other_part.clone());
-                                };
-                            });
-                        };
-                    }
-                    Content::Parts(slots, parts)
-                } else {
-                    Content::Parts(other_slots.clone(), other_parts.clone())
-                }
+            Content::Parts(Some(layout), Some(parts)) => {
+                layout.iter().fold(self, |content, slot| {
+                    content + (slot, parts.get(slot).unwrap())
+                })
             }
+
+            _ => self,
         }
     }
 }
@@ -323,13 +377,19 @@ impl<'a> Add<&Body<'a>> for Body<'a> {
 
     fn add(self, other: &Body<'a>) -> Self::Output {
         Body {
-            attrs: if let Some(ref other_attrs) = other.attrs {
-                Some(self.attrs.unwrap_or_default() + other_attrs)
+            attrs: if let Some(ref attrs) = other.attrs {
+                Some(
+                    self.attrs
+                        .map_or_else(|| attrs.clone(), |current_attrs| current_attrs + attrs),
+                )
             } else {
                 self.attrs
             },
-            content: if let Some(ref other_content) = other.content {
-                Some(self.content.unwrap_or_default() + other_content)
+            content: if let Some(ref content) = other.content {
+                Some(self.content.map_or_else(
+                    || content.clone(),
+                    |current_content| current_content + content,
+                ))
             } else {
                 self.content
             },
@@ -448,21 +508,14 @@ impl<'a> fmt::Display for AttrValue {
 
 impl<'a> fmt::Display for Content<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut generated_slots = None;
-
-        let create_id_part = |id: &str| Body {
-            attrs: Some([("id", id)].into()),
-            ..Default::default()
-        };
+        let create_id_part = |id: &str| Body::from(Attrs::new() + ("id", id));
 
         let content = match self {
             Self::Text(text) => text.into(),
 
-            Self::Parts(slots, Some(items)) => slots
-                .as_ref()
-                .unwrap_or_else(|| generated_slots.insert(items.keys().cloned().collect()))
+            Self::Parts(Some(layout), Some(parts)) => layout
                 .iter()
-                .filter_map(|name| match items.get(name) {
+                .filter_map(|name| match parts.get(name) {
                     Some(ContentPart::Item(item)) => {
                         Some(item.clone().add(&create_id_part(name)).to_string())
                     }
