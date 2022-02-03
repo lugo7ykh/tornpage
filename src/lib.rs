@@ -506,6 +506,18 @@ impl<'a> fmt::Display for AttrValue {
     }
 }
 
+impl<'a> fmt::Display for Attrs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let attrs = self
+            .iter()
+            .map(|(k, v)| format!(" {k}=\"{v}\""))
+            .reduce(|a, b| a + &b)
+            .unwrap_or_default();
+
+        write!(f, "{attrs}")
+    }
+}
+
 impl<'a> fmt::Display for Content<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let create_id_part = |id: &str| Body::from(Attrs::new() + ("id", id));
@@ -557,11 +569,7 @@ impl<'a> fmt::Display for Item<'a> {
         let attrs = match body {
             Some(Body {
                 attrs: Some(attrs), ..
-            }) => attrs
-                .iter()
-                .map(|(k, v)| format!(" {k}=\"{v}\""))
-                .reduce(|a, b| a + &b)
-                .unwrap_or_default(),
+            }) => attrs.to_string(),
             _ => "".into(),
         };
 
