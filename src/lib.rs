@@ -9,8 +9,6 @@ use std::{
     usize,
 };
 
-const DEFAULT_TAG: &str = "div";
-
 const EMPTY_ELEMENT_TAGS: [&str; 14] = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
     "track", "wbr",
@@ -115,7 +113,16 @@ pub struct Component<'a> {
     template: Option<Template<'a>>,
 }
 impl<'a> Component<'a> {
+    /// Create a new Component.
+    ///
+    /// # Panics
+    ///
+    /// The `new` function will panic if the tag is empty.
     pub fn new(tag: &str) -> Self {
+        if tag == "" {
+            panic!("Component tag must not be empty.");
+        };
+
         Self {
             tag: tag.into(),
             ..Default::default()
@@ -549,7 +556,6 @@ impl<'a> fmt::Display for Item<'a> {
         let Component { tag, template } = match wrapper {
             &Wrapper::Ref(component) | Wrapper::Custom(component) => component,
         };
-        let tag = if tag != "" { tag } else { DEFAULT_TAG };
 
         let template = template.as_ref().map(|template| match template {
             &Template::Ref(template) | Template::Custom(template) => template,
@@ -573,7 +579,7 @@ impl<'a> fmt::Display for Item<'a> {
             _ => "".into(),
         };
 
-        let content_part = if !EMPTY_ELEMENT_TAGS.contains(&tag) {
+        let content_part = if !EMPTY_ELEMENT_TAGS.contains(&tag.as_str()) {
             let content = match body {
                 Some(Body {
                     content: Some(content),

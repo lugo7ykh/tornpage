@@ -1,4 +1,4 @@
-use crate::{Attrs, Body, Content, Item};
+use super::*;
 
 fn create_item_1() -> Item<'static> {
     Item::new("a")
@@ -8,6 +8,12 @@ fn create_item_1() -> Item<'static> {
 
 fn create_body_1() -> Body<'static> {
     Body::from(Attrs::new() + ("class", "pretty") + ("href", "/hello")) + Content::from(" World!")
+}
+
+#[test]
+#[should_panic(expected = "Component tag must not be empty.")]
+fn dont_create_component_with_empty_tag() {
+    Component::new("");
 }
 
 #[test]
