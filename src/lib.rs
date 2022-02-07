@@ -9,10 +9,14 @@ use std::{
     usize,
 };
 
-const EMPTY_ELEMENT_TAGS: [&str; 14] = [
+const EMPTY_TAGS: [&str; 14] = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
     "track", "wbr",
 ];
+
+fn is_empty_tag(tag: &str) -> bool {
+    EMPTY_TAGS.contains(&tag)
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum AttrValue {
@@ -579,7 +583,7 @@ impl<'a> fmt::Display for Item<'a> {
             _ => "".into(),
         };
 
-        let content_part = if !EMPTY_ELEMENT_TAGS.contains(&tag.as_str()) {
+        let content_part = if !is_empty_tag(tag) {
             let content = match body {
                 Some(Body {
                     content: Some(content),
