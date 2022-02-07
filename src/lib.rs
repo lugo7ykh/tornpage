@@ -128,7 +128,7 @@ impl<'a> Component<'a> {
         };
 
         Self {
-            tag: tag.into(),
+            tag: tag.to_lowercase(),
             ..Default::default()
         }
     }
