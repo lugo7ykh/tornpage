@@ -110,6 +110,15 @@ impl<'a> Default for Template<'a> {
         Self::Custom(Default::default())
     }
 }
+impl<'a> Deref for Template<'a> {
+    type Target = Body<'a>;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Template::Ref(template) => template,
+            Template::Custom(template) => template,
+        }
+    }
+}
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub struct Component<'a> {
@@ -142,6 +151,16 @@ pub enum Wrapper<'a> {
 impl<'a> Default for Wrapper<'a> {
     fn default() -> Self {
         Self::Custom(Default::default())
+    }
+}
+impl<'a> Deref for Wrapper<'a> {
+    type Target = Component<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Wrapper::Ref(component) => component,
+            Wrapper::Custom(component) => component,
+        }
     }
 }
 
@@ -556,14 +575,8 @@ impl<'a> fmt::Display for Content<'a> {
 impl<'a> fmt::Display for Item<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Item { wrapper, body } = self;
-
-        let Component { tag, template } = match wrapper {
-            &Wrapper::Ref(component) | Wrapper::Custom(component) => component,
-        };
-
-        let template = template.as_ref().map(|template| match template {
-            &Template::Ref(template) | Template::Custom(template) => template,
-        });
+        let Component { tag, template } = wrapper.deref();
+        let template = template.as_ref().map(|template| template.deref());
 
         let mut glued_body = None;
         let body = if let Some(body) = body {
