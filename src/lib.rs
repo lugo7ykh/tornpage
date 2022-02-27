@@ -98,6 +98,11 @@ pub struct Body<'a> {
     attrs: Option<Attrs>,
     content: Option<Content<'a>>,
 }
+impl<'a> Body<'a> {
+    fn is_empty(&self) -> bool {
+        self.attrs.is_none() && self.content.is_none()
+    }
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Template<'a> {
