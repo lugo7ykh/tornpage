@@ -1,42 +1,28 @@
 use super::*;
 
 fn create_item_1() -> Item<'static> {
-    Item::new("a")
-        + (Attrs::new() + ("class", "button") + ("hreflang", "en"))
-        + Content::from("Hello")
-}
+    let mut item = Item::new("a");
+    item.set_attr("class", "button")
+        .set_attr("hreflang", "en")
+        .set_content("Hello");
 
-fn create_body_1() -> Body<'static> {
-    Body::from(Attrs::new() + ("class", "pretty") + ("href", "/hello")) + Content::from(" World!")
-}
-
-#[test]
-#[should_panic(expected = "Component tag must not be empty.")]
-fn dont_create_component_with_empty_tag() {
-    Component::new("");
+    item
 }
 
 #[test]
-fn add_body_to_item() {
-    let glued_item = create_item_1() + &create_body_1() + &create_body_1();
-
-    assert_eq!(
-        glued_item,
-        Item::new("a")
-            + (Attrs::new()
-                + ("class", ["pretty", "button"])
-                + ("hreflang", "en")
-                + ("href", "/hello"))
-            + Content::from("Hello World! World!"),
-    );
+#[should_panic(expected = "Tag must not be empty string.")]
+fn dont_create_wrapper_with_empty_tag() {
+    Wrapper::new("");
 }
 
 #[test]
-fn display_item_1() {
-    let rendered_item = create_item_1().to_string();
+fn item_to_string() {
+    let item_string = create_item_1().to_string();
+    let result_1 = "<a class=\"button\" hreflang=\"en\">\"Hello\"</a>";
+    let result_2 = "<a hreflang=\"en\" class=\"button\">\"Hello\"</a>";
 
     assert!(
-        rendered_item == "<a class=\"button\" hreflang=\"en\">Hello</a>"
-            || rendered_item == "<a hreflang=\"en\" class=\"button\">Hello</a>"
+        item_string == result_1 || item_string == result_2,
+        "result is {item_string}, but should be {result_1} or {result_2}"
     )
 }
